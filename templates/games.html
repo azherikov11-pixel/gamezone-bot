@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GameZone: 20 мини-игр</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1e24, #2a2f3a);
+            color: var(--text-primary);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        :root {
+            --bg-color: #1a1e24;
+            --card-bg: #242a32;
+            --accent: #8b9dc3;
+            --text-primary: #f0f2f5;
+            --text-secondary: #a0aaba;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff, #b0c4de);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .game-card {
+            background-color: var(--card-bg);
+            border-radius: 18px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .game-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+            border-color: var(--accent);
+        }
+        .game-emoji {
+            font-size: 3.5rem;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+        }
+        .game-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+        }
+        .game-category {
+            font-size: 0.8rem;
+            color: var(--accent);
+            background: rgba(139, 157, 195, 0.15);
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-weight: 500;
+        }
+        .back-button {
+            background-color: var(--card-bg);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            border-radius: 30px;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            width: fit-content;
+            margin: 0 auto;
+            display: block;
+        }
+        .back-button:hover {
+            background-color: var(--accent);
+            color: var(--bg-color);
+        }
+        .game-stats {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 10px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 GameZone</h1>
+            <p>Коллекция из 20 мини-игр. Нажми на любую, чтобы начать!</p>
+        </div>
+
+        <div class="games-grid" id="gamesGrid"></div>
+
+        <button class="back-button" onclick="closeApp()">
+            ⬅️ Закрыть и вернуться в чат
+        </button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        // Массив со всеми 20 играми
+        const gamesList = [
+            // Ряд 1: Экшн и спорт
+            { emoji: "🎯", name: "Дартс", category: "Экшн", url: "/play/darts", players: "1-2", time: "2 мин" },
+            { emoji: "⚽", name: "Пенальти", category: "Спорт", url: "/play/penalty", players: "1", time: "3 мин" },
+            { emoji: "🥊", name: "Удар силой", category: "Экшн", url: "/play/punch", players: "1", time: "∞" },
+            { emoji: "🏹", name: "Лук и стрелы", category: "Экшн", url: "/play/archery", players: "1", time: "2 мин" },
+            
+            // Ряд 2: Головоломки
+            { emoji: "🧩", name: "Пазл", category: "Головоломка", url: "/play/puzzle", players: "1", time: "5 мин" },
+            { emoji: "🧠", name: "Викторина", category: "Знания", url: "/play/quiz", players: "1", time: "∞" },
+            { emoji: "🧪", name: "Химия", category: "Головоломка", url: "/play/chemistry", players: "1", time: "10 мин" },
+            { emoji: "🐍", name: "Змейка", category: "Классика", url: "/play/snake", players: "1", time: "∞" },
+            
+            // Ряд 3: Азартные игры
+            { emoji: "🎲", name: "Кости", category: "Азарт", url: "/play/dice", players: "1", time: "2 мин" },
+            { emoji: "🃏", name: "21 очко", category: "Карты", url: "/play/blackjack", players: "1", time: "5 мин" },
+            { emoji: "🎰", name: "Слоты", category: "Азарт", url: "/play/slots", players: "1", time: "∞" },
+            { emoji: "🎣", name: "Рыбалка", category: "Спокойная", url: "/play/fishing", players: "1", time: "3 мин" },
+            
+            // Ряд 4: Гонки и приключения
+            { emoji: "🚀", name: "Космо-рейсер", category: "Аркада", url: "/play/space_racer", players: "1", time: "∞" },
+            { emoji: "🏁", name: "Ретро-гонки", category: "Гонки", url: "/play/retro_racer", players: "1", time: "3 мин" },
+            { emoji: "🤠", name: "Дуэль", category: "Экшн", url: "/play/duel", players: "1", time: "2 мин" },
+            { emoji: "🤖", name: "Битва роботов", category: "Экшн", url: "/play/robot_battle", players: "1", time: "5 мин" },
+            
+            // Ряд 5: Творчество и стратегии
+            { emoji: "🎨", name: "Рисовалка", category: "Творчество", url: "/play/drawing", players: "1", time: "∞" },
+            { emoji: "🎵", name: "Ритм-игра", category: "Музыка", url: "/play/rhythm", players: "1", time: "3 мин" },
+            { emoji: "👑", name: "Королевство", category: "Стратегия", url: "/play/kingdom", players: "1", time: "15 мин" },
+            { emoji: "🎮", name: "Ретро-аркада", category: "Классика", url: "/play/arcade", players: "1", time: "5 мин" }
+        ];
+
+        function renderGames() {
+            const grid = document.getElementById('gamesGrid');
+            grid.innerHTML = '';
+
+            gamesList.forEach((game, index) => {
+                const card = document.createElement('div');
+                card.className = 'game-card';
+                card.setAttribute('data-url', game.url);
+                card.setAttribute('data-name', game.name);
+
+                card.innerHTML = `
+                    <div class="game-emoji">${game.emoji}</div>
+                    <div class="game-title">${game.name}</div>
+                    <span class="game-category">${game.category}</span>
+                    <div class="game-stats">
+                        <span>👤 ${game.players}</span>
+                        <span>⏱️ ${game.time}</span>
+                    </div>
+                `;
+
+                card.addEventListener('click', function() {
+                    launchGame(game.name, game.url);
+                });
+
+                grid.appendChild(card);
+            });
+        }
+
+        function launchGame(gameName, gameUrl) {
+            // Показываем уведомление о запуске
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: var(--card-bg);
+                color: var(--accent);
+                padding: 12px 24px;
+                border-radius: 40px;
+                font-size: 1rem;
+                border: 1px solid var(--accent);
+                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                z-index: 1000;
+                animation: slideDown 0.3s;
+            `;
+            toast.textContent = `🎮 Запускаем "${gameName}"...`;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.animation = 'slideUp 0.3s';
+                setTimeout(() => toast.remove(), 300);
+                
+                // Переходим к игре
+                window.location.href = gameUrl;
+            }, 1000);
+        }
+
+        function closeApp() {
+            tg.close();
+        }
+
+        // Добавляем анимации
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideDown {
+                from { transform: translate(-50%, -100%); opacity: 0; }
+                to { transform: translate(-50%, 0); opacity: 1; }
+            }
+            @keyframes slideUp {
+                from { transform: translate(-50%, 0); opacity: 1; }
+                to { transform: translate(-50%, -100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Приветствие пользователя
+        if (tg.initDataUnsafe?.user) {
+            const user = tg.initDataUnsafe.user;
+            const header = document.querySelector('.header p');
+            if (header) {
+                header.textContent = `Привет, ${user.first_name}! Выбери игру из 20 доступных 👇`;
+            }
+        }
+
+        // Запускаем рендер
+        renderGames();
+    </script>
+</body>
+</html>
