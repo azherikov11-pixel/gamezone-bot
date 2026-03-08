@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пенальти</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1b5e20, #2e7d32);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        .game-container {
+            background: #2e7d32;
+            padding: 30px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 90%;
+            max-width: 700px;
+            border: 3px solid white;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .field {
+            background: #1b5e20;
+            border: 3px solid white;
+            border-radius: 20px;
+            padding: 30px;
+            margin: 20px 0;
+            position: relative;
+        }
+        .goal {
+            width: 100%;
+            height: 250px;
+            border: 4px solid white;
+            border-top: none;
+            position: relative;
+            background: #0d3d0d;
+            overflow: hidden;
+        }
+        .goal-net {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.1) 20px, transparent 20px, transparent 40px);
+        }
+        .goalkeeper {
+            position: absolute;
+            width: 100px;
+            height: 140px;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            transition: all 0.3s;
+            z-index: 5;
+        }
+        .goalkeeper.diving-left {
+            transform: translateX(-150%) rotate(-20deg);
+        }
+        .goalkeeper.diving-right {
+            transform: translateX(50%) rotate(20deg);
+        }
+        .goalkeeper.saving {
+            transform: translateX(-50%) scale(1.1);
+        }
+        .goalkeeper-body {
+            width: 100%;
+            height: 100%;
+            background: #ff6b6b;
+            border-radius: 50px 50px 20px 20px;
+            position: relative;
+            border: 3px solid white;
+        }
+        .goalkeeper-head {
+            width: 50px;
+            height: 50px;
+            background: #ffe0b0;
+            border-radius: 50%;
+            position: absolute;
+            top: -25px;
+            left: 25px;
+            border: 3px solid white;
+        }
+        .ball {
+            width: 30px;
+            height: 30px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 2px solid black;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.3);
+            z-index: 10;
+            transition: none;
+        }
+        .ball-trajectory {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .score-board {
+            display: flex;
+            justify-content: space-around;
+            font-size: 2rem;
+            margin: 20px 0;
+            background: #1b5e20;
+            padding: 15px;
+            border-radius: 15px;
+            border: 2px solid #ffd700;
+        }
+        .direction-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .dir-btn {
+            background: #ffd700;
+            color: #1b5e20;
+            border: none;
+            padding: 20px;
+            font-size: 1.3rem;
+            border-radius: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid white;
+        }
+        .dir-btn:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(255,215,0,0.5);
+        }
+        .dir-btn.selected {
+            background: #ffaa00;
+        }
+        .power-meter {
+            background: #1b5e20;
+            padding: 15px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+        .meter {
+            width: 100%;
+            height: 30px;
+            background: #0a3a0a;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 10px 0;
+            border: 2px solid white;
+        }
+        .meter-fill {
+            height: 100%;
+            width: 50%;
+            background: linear-gradient(90deg, #ffd700, #ff6b6b);
+            transition: width 0.1s;
+        }
+        .action-btn {
+            background: #ffd700;
+            color: #1b5e20;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            border: 2px solid white;
+        }
+        .action-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255,215,0,0.5);
+        }
+        .back-btn {
+            background: transparent;
+            color: #ffd700;
+            border: 2px solid #ffd700;
+        }
+        .message {
+            font-size: 1.5rem;
+            margin: 20px 0;
+            min-height: 50px;
+            color: #ffd700;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>⚽ Пенальти</h1>
+        
+        <div class="score-board">
+            <div>Игрок: <span id="playerScore">0</span></div>
+            <div>Вратарь: <span id="aiScore">0</span></div>
+        </div>
+        
+        <div class="field">
+            <div class="goal" id="goal">
+                <div class="goal-net"></div>
+                <div class="goalkeeper" id="goalkeeper">
+                    <div class="goalkeeper-body">
+                        <div class="goalkeeper-head"></div>
+                    </div>
+                </div>
+                <div class="ball" id="ball"></div>
+            </div>
+        </div>
+        
+        <div class="power-meter">
+            <div>Сила удара</div>
+            <div class="meter">
+                <div class="meter-fill" id="powerFill"></div>
+            </div>
+        </div>
+        
+        <div class="direction-buttons">
+            <button class="dir-btn" onclick="setDirection('left')" id="dirLeft">⬅️ Левый</button>
+            <button class="dir-btn" onclick="setDirection('center')" id="dirCenter">⬆️ Центр</button>
+            <button class="dir-btn" onclick="setDirection('right')" id="dirRight">➡️ Правый</button>
+        </div>
+        
+        <div class="message" id="message">Выбери направление!</div>
+        
+        <button class="action-btn" onclick="shoot()" id="shootBtn" disabled>⚽ УДАРИТЬ!</button>
+        <button class="action-btn" onclick="newGame()">🔄 Новая игра</button>
+        <button class="back-btn" onclick="closeGame()">⬅️ Назад</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let playerScore = 0;
+        let aiScore = 0;
+        let currentDirection = null;
+        let power = 50;
+        let canShoot = true;
+        let shotsLeft = 5;
+        let powerInterval;
+
+        function startPowerMeter() {
+            if (powerInterval) clearInterval(powerInterval);
+            power = 30;
+            let increasing = true;
+            
+            powerInterval = setInterval(() => {
+                if (increasing) {
+                    power += 2;
+                    if (power >= 100) increasing = false;
+                } else {
+                    power -= 2;
+                    if (power <= 30) increasing = true;
+                }
+                document.getElementById('powerFill').style.width = power + '%';
+            }, 50);
+        }
+
+        function setDirection(dir) {
+            currentDirection = dir;
+            document.querySelectorAll('.dir-btn').forEach(btn => btn.classList.remove('selected'));
+            document.getElementById(`dir${dir.charAt(0).toUpperCase() + dir.slice(1)}`).classList.add('selected');
+            
+            document.getElementById('shootBtn').disabled = false;
+            document.getElementById('message').textContent = `Направление: ${dir === 'left' ? 'Левый' : dir === 'right' ? 'Правый' : 'Центр'}`;
+            
+            startPowerMeter();
+        }
+
+        function shoot() {
+            if (!canShoot || !currentDirection) {
+                alert('Сначала выбери направление!');
+                return;
+            }
+            
+            if (shotsLeft <= 0) {
+                endGame();
+                return;
+            }
+            
+            canShoot = false;
+            clearInterval(powerInterval);
+            document.getElementById('shootBtn').disabled = true;
+            document.querySelectorAll('.dir-btn').forEach(btn => btn.disabled = true);
+            
+            const ball = document.getElementById('ball');
+            const gk = document.getElementById('goalkeeper');
+            
+            // ИИ вратаря
+            const aiDirection = Math.random();
+            let aiMove;
+            
+            if (power > 80) {
+                aiMove = aiDirection < 0.33 ? 'left' : (aiDirection < 0.66 ? 'center' : 'right');
+            } else {
+                if (aiDirection < 0.4) {
+                    aiMove = currentDirection;
+                } else if (aiDirection < 0.7) {
+                    aiMove = currentDirection === 'left' ? 'center' : (currentDirection === 'center' ? 'right' : 'left');
+                } else {
+                    aiMove = currentDirection === 'left' ? 'right' : (currentDirection === 'center' ? 'left' : 'center');
+                }
+            }
+            
+            // Анимация полета мяча
+            let startLeft = 50; // проценты
+            let targetLeft;
+            
+            if (currentDirection === 'left') {
+                targetLeft = 20;
+            } else if (currentDirection === 'right') {
+                targetLeft = 80;
+            } else {
+                targetLeft = 50;
+            }
+            
+            // Добавляем отклонение из-за силы удара
+            const powerFactor = power / 100;
+            const curveAmount = (Math.random() - 0.5) * 20 * (1 - powerFactor);
+            
+            let frames = 0;
+            const maxFrames = 30;
+            
+            const ballInterval = setInterval(() => {
+                frames++;
+                const progress = frames / maxFrames;
+                
+                // Плавное движение по горизонтали
+                const currentLeft = startLeft + (targetLeft - startLeft + curveAmount * Math.sin(progress * Math.PI)) * progress;
+                ball.style.left = currentLeft + '%';
+                
+                // Вертикальный полет с параболой
+                const bottom = -30 + (280 * progress);
+                ball.style.bottom = bottom + 'px';
+                
+                if (frames >= maxFrames) {
+                    clearInterval(ballInterval);
+                    
+                    // Проверка гола
+                    const isGoal = (currentDirection !== aiMove);
+                    
+                    if (isGoal) {
+                        playerScore++;
+                        document.getElementById('message').textContent = '🎉 ГООООЛ!';
+                        
+                        if (currentDirection === 'left') {
+                            gk.classList.add('diving-right');
+                        } else if (currentDirection === 'right') {
+                            gk.classList.add('diving-left');
+                        }
+                    } else {
+                        aiScore++;
+                        document.getElementById('message').textContent = '😢 Вратарь спасает!';
+                        gk.classList.add('saving');
+                        
+                        // Мяч отлетает
+                        setTimeout(() => {
+                            ball.style.left = aiMove === 'left' ? '20%' : (aiMove === 'right' ? '80%' : '50%');
+                            ball.style.bottom = '150px';
+                        }, 100);
+                    }
+                    
+                    document.getElementById('playerScore').textContent = playerScore;
+                    document.getElementById('aiScore').textContent = aiScore;
+                    shotsLeft--;
+                    
+                    setTimeout(() => {
+                        ball.style.left = '50%';
+                        ball.style.bottom = '-30px';
+                        gk.classList.remove('diving-left', 'diving-right', 'saving');
+                        
+                        if (shotsLeft > 0) {
+                            canShoot = true;
+                            currentDirection = null;
+                            document.querySelectorAll('.dir-btn').forEach(btn => {
+                                btn.classList.remove('selected');
+                                btn.disabled = false;
+                            });
+                            document.getElementById('message').textContent = `Осталось ударов: ${shotsLeft}`;
+                        } else {
+                            endGame();
+                        }
+                    }, 1000);
+                }
+            }, 30);
+        }
+
+        function endGame() {
+            if (playerScore > aiScore) {
+                document.getElementById('message').textContent = '🎉 ПОБЕДА!';
+            } else if (playerScore < aiScore) {
+                document.getElementById('message').textContent = '😢 Поражение...';
+            } else {
+                document.getElementById('message').textContent = '🤝 Ничья!';
+            }
+            canShoot = false;
+        }
+
+        function newGame() {
+            playerScore = 0;
+            aiScore = 0;
+            shotsLeft = 5;
+            canShoot = true;
+            currentDirection = null;
+            power = 50;
+            
+            document.getElementById('playerScore').textContent = '0';
+            document.getElementById('aiScore').textContent = '0';
+            document.getElementById('message').textContent = 'Выбери направление!';
+            document.querySelectorAll('.dir-btn').forEach(btn => {
+                btn.classList.remove('selected');
+                btn.disabled = false;
+            });
+            document.getElementById('shootBtn').disabled = true;
+            document.getElementById('powerFill').style.width = '50%';
+            
+            const ball = document.getElementById('ball');
+            ball.style.left = '50%';
+            ball.style.bottom = '-30px';
+            
+            const gk = document.getElementById('goalkeeper');
+            gk.classList.remove('diving-left', 'diving-right', 'saving');
+            
+            if (powerInterval) clearInterval(powerInterval);
+        }
+
+        function closeGame() {
+            tg.close();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Лук и стрелы</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #2e5e3a, #3e7a4a);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        .game-container {
+            background: #3e7a4a;
+            padding: 30px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 90%;
+            max-width: 800px;
+            border: 3px solid #8b4513;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .range {
+            background: #2e5e3a;
+            border: 4px solid #8b4513;
+            border-radius: 20px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        .target-area {
+            position: relative;
+            height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .target {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            cursor: crosshair;
+        }
+        .target-circle {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+        .circle-1 {
+            width: 200px;
+            height: 200px;
+            background: #e74c3c;
+            border-width: 4px;
+        }
+        .circle-2 {
+            width: 160px;
+            height: 160px;
+            top: 20px;
+            left: 20px;
+            background: white;
+        }
+        .circle-3 {
+            width: 120px;
+            height: 120px;
+            top: 40px;
+            left: 40px;
+            background: #e74c3c;
+        }
+        .circle-4 {
+            width: 80px;
+            height: 80px;
+            top: 60px;
+            left: 60px;
+            background: white;
+        }
+        .bullseye {
+            width: 40px;
+            height: 40px;
+            top: 80px;
+            left: 80px;
+            background: #ffd700;
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: 0 0 20px #ffd700;
+        }
+        .archer {
+            position: absolute;
+            left: 50px;
+            bottom: 50px;
+            font-size: 4rem;
+            transform: scaleX(-1);
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .controls {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .power-slider {
+            width: 300px;
+            height: 10px;
+            background: #2e5e3a;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .power-fill {
+            height: 100%;
+            width: 50%;
+            background: linear-gradient(90deg, #ffd700, #e74c3c);
+            transition: width 0.1s;
+        }
+        .score {
+            font-size: 2rem;
+            color: #ffd700;
+            margin: 10px 0;
+        }
+        .arrows-left {
+            font-size: 1.2rem;
+            color: #fff;
+        }
+        .action-btn {
+            background: #8b4513;
+            color: #ffd700;
+            border: 2px solid #ffd700;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        .action-btn:hover {
+            background: #a0522d;
+            transform: translateY(-2px);
+        }
+        .back-btn {
+            background: transparent;
+            color: #8b4513;
+            border: 2px solid #8b4513;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🏹 Лук и стрелы</h1>
+        
+        <div class="range">
+            <div class="target-area" id="targetArea">
+                <div class="archer">🏹</div>
+                <div class="target" id="target" onclick="shoot(event)">
+                    <div class="target-circle circle-1"></div>
+                    <div class="target-circle circle-2"></div>
+                    <div class="target-circle circle-3"></div>
+                    <div class="target-circle circle-4"></div>
+                    <div class="bullseye"></div>
+                </div>
+                <canvas id="arrowCanvas" width="800" height="300"></canvas>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div style="flex: 1;">
+                <div>Сила натяжения</div>
+                <div class="power-slider">
+                    <div class="power-fill" id="powerFill"></div>
+                </div>
+            </div>
+            <div class="score">🎯 Счет: <span id="score">0</span></div>
+            <div class="arrows-left">Стрел: <span id="arrows">10</span></div>
+        </div>
+        
+        <button class="action-btn" onclick="drawBow()" id="drawBtn">🏹 Натянуть лук</button>
+        <button class="action-btn" onclick="resetArchery()">🔄 Новая игра</button>
+        <button class="back-btn" onclick="closeGame()">⬅️ Назад</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let score = 0;
+        let arrows = 10;
+        let power = 50;
+        let isDrawn = false;
+        let powerInterval;
+        let arrows2 = [];
+        
+        const canvas = document.getElementById('arrowCanvas');
+        const ctx = canvas.getContext('2d');
+
+        class Arrow {
+            constructor(startX, startY, targetX, targetY, power) {
+                this.startX = startX;
+                this.startY = startY;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.x = startX;
+                this.y = startY;
+                this.progress = 0;
+                this.speed = power / 5000;
+                this.stuck = false;
+                
+                const dx = targetX - startX;
+                const dy = targetY - startY;
+                this.angle = Math.atan2(dy, dx);
+                this.distance = Math.sqrt(dx * dx + dy * dy);
+            }
+            
+            update() {
+                if (this.stuck) return;
+                
+                this.progress += this.speed;
+                
+                if (this.progress >= 1) {
+                    this.stuck = true;
+                    this.progress = 1;
+                    this.calculateScore();
+                }
+                
+                this.x = this.startX + (this.targetX - this.startX) * this.progress;
+                this.y = this.startY + (this.targetY - this.startY) * this.progress;
+            }
+            
+            calculateScore() {
+                const target = document.getElementById('target');
+                const rect = target.getBoundingClientRect();
+                const canvasRect = canvas.getBoundingClientRect();
+                
+                const targetCenterX = rect.left + rect.width/2 - canvasRect.left;
+                const targetCenterY = rect.top + rect.height/2 - canvasRect.top;
+                
+                const dx = this.x - targetCenterX;
+                const dy = this.y - targetCenterY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                let points = 0;
+                if (distance <= 20) points = 50;
+                else if (distance <= 40) points = 30;
+                else if (distance <= 60) points = 20;
+                else if (distance <= 80) points = 10;
+                else if (distance <= 100) points = 5;
+                
+                if (points > 0) {
+                    score += points;
+                    document.getElementById('score').textContent = score;
+                }
+            }
+            
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                
+                ctx.strokeStyle = '#8b4513';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-10, 0);
+                ctx.lineTo(20, 0);
+                ctx.stroke();
+                
+                ctx.fillStyle = '#ffd700';
+                ctx.beginPath();
+                ctx.moveTo(20, -3);
+                ctx.lineTo(30, 0);
+                ctx.lineTo(20, 3);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.restore();
+            }
+        }
+
+        function drawBow() {
+            if (arrows <= 0) {
+                alert('Стрелы закончились!');
+                return;
+            }
+            
+            isDrawn = true;
+            document.getElementById('drawBtn').disabled = true;
+            
+            power = 30;
+            let increasing = true;
+            
+            powerInterval = setInterval(() => {
+                if (increasing) {
+                    power += 2;
+                    if (power >= 100) increasing = false;
+                } else {
+                    power -= 2;
+                    if (power <= 30) increasing = true;
+                }
+                document.getElementById('powerFill').style.width = power + '%';
+            }, 50);
+        }
+
+        function shoot(event) {
+            if (!isDrawn || arrows <= 0) return;
+            
+            isDrawn = false;
+            arrows--;
+            clearInterval(powerInterval);
+            
+            document.getElementById('arrows').textContent = arrows;
+            document.getElementById('drawBtn').disabled = false;
+            
+            const target = document.getElementById('target');
+            const rect = target.getBoundingClientRect();
+            const canvasRect = canvas.getBoundingClientRect();
+            
+            const scaleX = canvas.width / canvasRect.width;
+            const scaleY = canvas.height / canvasRect.height;
+            
+            const targetX = (event.clientX - canvasRect.left) * scaleX;
+            const targetY = (event.clientY - canvasRect.top) * scaleY;
+            
+            // Добавляем случайное отклонение в зависимости от силы
+            const accuracy = 1 - (Math.abs(power - 75) / 100);
+            const deviation = (1 - accuracy) * 50;
+            
+            const finalX = targetX + (Math.random() - 0.5) * deviation;
+            const finalY = targetY + (Math.random() - 0.5) * deviation;
+            
+            const arrow = new Arrow(100, 250, finalX, finalY, power);
+            arrows2.push(arrow);
+            
+            animate();
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            let allStuck = true;
+            
+            arrows2.forEach(arrow => {
+                arrow.update();
+                arrow.draw();
+                if (!arrow.stuck) allStuck = false;
+            });
+            
+            if (!allStuck) {
+                requestAnimationFrame(animate);
+            }
+        }
+
+        function resetArchery() {
+            score = 0;
+            arrows = 10;
+            power = 50;
+            isDrawn = false;
+            arrows2 = [];
+            
+            document.getElementById('score').textContent = '0';
+            document.getElementById('arrows').textContent = '10';
+            document.getElementById('powerFill').style.width = '50%';
+            document.getElementById('drawBtn').disabled = false;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (powerInterval) clearInterval(powerInterval);
+        }
+
+        function closeGame() {
+            tg.close();
+        }
+    </script>
+</body>
+</html>

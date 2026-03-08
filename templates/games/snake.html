@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Змейка</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a4a3a, #2a5a4a);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        .game-container {
+            background: #2a5a4a;
+            padding: 30px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 90%;
+            max-width: 600px;
+            border: 3px solid #7fff00;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #7fff00;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        canvas {
+            background: #1a4a3a;
+            border: 4px solid #7fff00;
+            border-radius: 15px;
+            display: block;
+            margin: 20px auto;
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+        }
+        .score-board {
+            font-size: 2rem;
+            color: #7fff00;
+            margin: 10px 0;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 200px;
+            margin: 20px auto;
+        }
+        .control-btn {
+            background: #7fff00;
+            color: #1a4a3a;
+            border: none;
+            padding: 15px;
+            font-size: 1.5rem;
+            border-radius: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .control-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 15px rgba(127,255,0,0.3);
+        }
+        .action-btn {
+            background: #7fff00;
+            color: #1a4a3a;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(127,255,0,0.3);
+        }
+        .back-btn {
+            background: transparent;
+            color: #7fff00;
+            border: 2px solid #7fff00;
+        }
+        .game-over {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            padding: 30px;
+            border-radius: 20px;
+            border: 3px solid #7fff00;
+            display: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🐍 Змейка</h1>
+        
+        <div class="score-board">🍎 Счет: <span id="score">0</span></div>
+        
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        
+        <div class="controls">
+            <div></div>
+            <button class="control-btn" onclick="changeDirection('up')">↑</button>
+            <div></div>
+            <button class="control-btn" onclick="changeDirection('left')">←</button>
+            <button class="control-btn" onclick="changeDirection('down')">↓</button>
+            <button class="control-btn" onclick="changeDirection('right')">→</button>
+        </div>
+        
+        <button class="action-btn" onclick="startGame()" id="startBtn">▶️ Старт</button>
+        <button class="action-btn" onclick="pauseGame()" id="pauseBtn" disabled>⏸️ Пауза</button>
+        <button class="action-btn" onclick="resetSnake()">🔄 Новая игра</button>
+        <button class="back-btn" onclick="closeGame()">⬅️ Назад</button>
+    </div>
+    
+    <div class="game-over" id="gameOver">
+        <h2>Игра окончена!</h2>
+        <p style="font-size: 2rem; margin: 20px;" id="finalScore"></p>
+        <button class="action-btn" onclick="resetSnake()">Играть снова</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const gridSize = 20;
+        const tileCount = canvas.width / gridSize;
+        
+        let snake = [
+            {x: 10, y: 10},
+            {x: 9, y: 10},
+            {x: 8, y: 10}
+        ];
+        let direction = {x: 1, y: 0}; // Начальное направление - вправо
+        let food = {};
+        let score = 0;
+        let gameRunning = false;
+        let gamePaused = false;
+        let gameInterval;
+
+        function generateFood() {
+            do {
+                food = {
+                    x: Math.floor(Math.random() * tileCount),
+                    y: Math.floor(Math.random() * tileCount)
+                };
+            } while (snake.some(segment => segment.x === food.x && segment.y === food.y));
+        }
+
+        function draw() {
+            // Очистка поля
+            ctx.fillStyle = '#1a4a3a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Рисуем сетку
+            ctx.strokeStyle = '#2a5a4a';
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i <= tileCount; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * gridSize, 0);
+                ctx.lineTo(i * gridSize, canvas.height);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(0, i * gridSize);
+                ctx.lineTo(canvas.width, i * gridSize);
+                ctx.stroke();
+            }
+            
+            // Рисуем змейку
+            snake.forEach((segment, index) => {
+                if (index === 0) {
+                    // Голова
+                    ctx.fillStyle = '#7fff00';
+                    ctx.shadowColor = '#7fff00';
+                } else {
+                    // Тело
+                    const gradient = ctx.createLinearGradient(
+                        segment.x * gridSize, segment.y * gridSize,
+                        (segment.x + 1) * gridSize, (segment.y + 1) * gridSize
+                    );
+                    gradient.addColorStop(0, '#32cd32');
+                    gradient.addColorStop(1, '#228b22');
+                    ctx.fillStyle = gradient;
+                    ctx.shadowColor = '#32cd32';
+                }
+                
+                ctx.shadowBlur = 10;
+                ctx.fillRect(
+                    segment.x * gridSize + 2,
+                    segment.y * gridSize + 2,
+                    gridSize - 4,
+                    gridSize - 4
+                );
+                
+                // Глаза на голове
+                if (index === 0) {
+                    ctx.fillStyle = 'white';
+                    ctx.shadowBlur = 0;
+                    
+                    ctx.beginPath();
+                    ctx.arc(
+                        segment.x * gridSize + gridSize/3,
+                        segment.y * gridSize + gridSize/3,
+                        3, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.arc(
+                        segment.x * gridSize + 2*gridSize/3,
+                        segment.y * gridSize + gridSize/3,
+                        3, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                    
+                    ctx.fillStyle = 'black';
+                    ctx.beginPath();
+                    ctx.arc(
+                        segment.x * gridSize + gridSize/3,
+                        segment.y * gridSize + gridSize/3,
+                        1, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.arc(
+                        segment.x * gridSize + 2*gridSize/3,
+                        segment.y * gridSize + gridSize/3,
+                        1, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+            });
+            
+            // Рисуем еду
+            ctx.shadowColor = '#ff0000';
+            ctx.shadowBlur = 15;
+            ctx.fillStyle = '#ff4444';
+            ctx.beginPath();
+            ctx.arc(
+                food.x * gridSize + gridSize/2,
+                food.y * gridSize + gridSize/2,
+                gridSize/2 - 2,
+                0, Math.PI * 2
+            );
+            ctx.fill();
+            
+            ctx.shadowBlur = 0;
+        }
+
+        function update() {
+            if (!gameRunning || gamePaused) return;
+            
+            // Двигаем голову
+            const head = {x: snake[0].x + direction.x, y: snake[0].y + direction.y};
+            
+            // Проверка на стены
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+                gameOver();
+                return;
+            }
+            
+            // Проверка на столкновение с собой
+            if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                gameOver();
+                return;
+            }
+            
+            snake.unshift(head);
+            
+            // Проверка на еду
+            if (head.x === food.x && head.y === food.y) {
+                score += 10;
+                document.getElementById('score').textContent = score;
+                generateFood();
+                
+                if (navigator.vibrate) {
+                    navigator.vibrate(50);
+                }
+            } else {
+                snake.pop();
+            }
+            
+            draw();
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            clearInterval(gameInterval);
+            
+            document.getElementById('finalScore').textContent = `Счет: ${score}`;
+            document.getElementById('gameOver').style.display = 'block';
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = true;
+        }
+
+        function startGame() {
+            if (!gameRunning) {
+                gameRunning = true;
+                gamePaused = false;
+                if (gameInterval) clearInterval(gameInterval);
+                gameInterval = setInterval(update, 150);
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('pauseBtn').disabled = false;
+            } else if (gamePaused) {
+                gamePaused = false;
+                document.getElementById('pauseBtn').textContent = '⏸️ Пауза';
+            }
+        }
+
+        function pauseGame() {
+            if (gameRunning) {
+                gamePaused = !gamePaused;
+                document.getElementById('pauseBtn').textContent = gamePaused ? '▶️ Продолжить' : '⏸️ Пауза';
+            }
+        }
+
+        function resetSnake() {
+            snake = [
+                {x: 10, y: 10},
+                {x: 9, y: 10},
+                {x: 8, y: 10}
+            ];
+            direction = {x: 1, y: 0};
+            score = 0;
+            gameRunning = false;
+            gamePaused = false;
+            
+            document.getElementById('score').textContent = '0';
+            document.getElementById('gameOver').style.display = 'none';
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = true;
+            document.getElementById('pauseBtn').textContent = '⏸️ Пауза';
+            
+            clearInterval(gameInterval);
+            generateFood();
+            draw();
+        }
+
+        function changeDirection(newDir) {
+            if (!gameRunning || gamePaused) return;
+            
+            switch(newDir) {
+                case 'up':
+                    if (direction.y === 0) direction = {x: 0, y: -1};
+                    break;
+                case 'down':
+                    if (direction.y === 0) direction = {x: 0, y: 1};
+                    break;
+                case 'left':
+                    if (direction.x === 0) direction = {x: -1, y: 0};
+                    break;
+                case 'right':
+                    if (direction.x === 0) direction = {x: 1, y: 0};
+                    break;
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (!gameRunning || gamePaused) return;
+            
+            switch(e.key) {
+                case 'ArrowUp':
+                    if (direction.y === 0) direction = {x: 0, y: -1};
+                    break;
+                case 'ArrowDown':
+                    if (direction.y === 0) direction = {x: 0, y: 1};
+                    break;
+                case 'ArrowLeft':
+                    if (direction.x === 0) direction = {x: -1, y: 0};
+                    break;
+                case 'ArrowRight':
+                    if (direction.x === 0) direction = {x: 1, y: 0};
+                    break;
+            }
+        });
+
+        function closeGame() {
+            tg.close();
+        }
+
+        // Инициализация
+        generateFood();
+        draw();
+    </script>
+</body>
+</html>

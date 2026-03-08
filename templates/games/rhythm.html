@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ритм-игра</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        .game-container {
+            background: #16213e;
+            padding: 30px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 90%;
+            max-width: 600px;
+            border: 3px solid #ff00ff;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #ff00ff;
+            text-shadow: 0 0 20px #ff00ff;
+        }
+        .lanes {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 30px 0;
+        }
+        .lane {
+            width: 80px;
+            height: 400px;
+            background: #0f3460;
+            border-radius: 15px;
+            position: relative;
+            overflow: hidden;
+            border: 2px solid #ff00ff;
+        }
+        .note {
+            position: absolute;
+            width: 70px;
+            height: 30px;
+            background: #ff00ff;
+            border-radius: 15px;
+            left: 5px;
+            box-shadow: 0 0 20px #ff00ff;
+            transition: top 0.1s linear;
+        }
+        .hit-area {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 60px;
+            background: rgba(255,0,255,0.3);
+            border-top: 2px solid #ff00ff;
+        }
+        .score {
+            font-size: 2rem;
+            color: #ff00ff;
+            margin: 20px;
+        }
+        .combo {
+            font-size: 1.5rem;
+            color: #00ff00;
+        }
+        .timing {
+            font-size: 2rem;
+            margin: 10px;
+            transition: all 0.1s;
+        }
+        .timing.perfect { color: #00ff00; transform: scale(1.2); }
+        .timing.good { color: #ffff00; }
+        .timing.miss { color: #ff0000; }
+        .action-btn {
+            background: #ff00ff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255,0,255,0.3);
+        }
+        .back-btn {
+            background: transparent;
+            color: #ff00ff;
+            border: 2px solid #ff00ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🎵 Ритм-игра</h1>
+        
+        <div class="score">Счет: <span id="score">0</span></div>
+        <div class="combo">🔥 x<span id="combo">0</span></div>
+        <div class="timing" id="timing">👆</div>
+        
+        <div class="lanes" id="lanes">
+            <div class="lane" id="lane1" onclick="hit(1)">
+                <div class="hit-area"></div>
+            </div>
+            <div class="lane" id="lane2" onclick="hit(2)">
+                <div class="hit-area"></div>
+            </div>
+            <div class="lane" id="lane3" onclick="hit(3)">
+                <div class="hit-area"></div>
+            </div>
+            <div class="lane" id="lane4" onclick="hit(4)">
+                <div class="hit-area"></div>
+            </div>
+        </div>
+        
+        <button class="action-btn" onclick="startRhythm()">▶️ Старт</button>
+        <button class="action-btn" onclick="stopRhythm()">⏹️ Стоп</button>
+        <button class="back-btn" onclick="closeGame()">⬅️ Назад</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let score = 0;
+        let combo = 0;
+        let gameActive = false;
+        let notes = [];
+        let gameInterval;
+        
+        const lanes = [1, 2, 3, 4];
+
+        function createNote() {
+            const lane = Math.floor(Math.random() * 4) + 1;
+            const note = {
+                lane: lane,
+                y: 0,
+                element: null,
+                active: true
+            };
+            
+            notes.push(note);
+            
+            const laneElement = document.getElementById(`lane${lane}`);
+            const noteElement = document.createElement('div');
+            noteElement.className = 'note';
+            noteElement.style.top = '0px';
+            laneElement.appendChild(noteElement);
+            
+            note.element = noteElement;
+        }
+
+        function update() {
+            if (!gameActive) return;
+            
+            notes.forEach(note => {
+                if (note.active) {
+                    note.y += 2;
+                    note.element.style.top = note.y + 'px';
+                    
+                    // Проверка на пропуск
+                    if (note.y > 340) {
+                        miss(note);
+                    }
+                }
+            });
+            
+            // Удаление старых нот
+            notes = notes.filter(n => n.active);
+            
+            // Создание новой ноты
+            if (Math.random() < 0.05) {
+                createNote();
+            }
+        }
+
+        function hit(lane) {
+            if (!gameActive) return;
+            
+            const hitWindow = 340; // Зона попадания
+            
+            // Ищем ближайшую ноту в этом лейне
+            const note = notes.find(n => n.lane === lane && Math.abs(n.y - hitWindow) < 30);
+            
+            if (note) {
+                const timing = Math.abs(note.y - hitWindow);
+                
+                if (timing < 10) {
+                    score += 100;
+                    combo++;
+                    showTiming('PERFECT!', 'perfect');
+                } else if (timing < 20) {
+                    score += 50;
+                    combo++;
+                    showTiming('GOOD!', 'good');
+                } else {
+                    score += 25;
+                    combo++;
+                    showTiming('OK!', 'good');
+                }
+                
+                // Удаляем ноту
+                note.element.remove();
+                note.active = false;
+                
+                document.getElementById('score').textContent = score;
+                document.getElementById('combo').textContent = combo;
+                
+                // Вибрация
+                if (navigator.vibrate) {
+                    navigator.vibrate(50);
+                }
+            } else {
+                combo = 0;
+                showTiming('MISS!', 'miss');
+                document.getElementById('combo').textContent = '0';
+            }
+        }
+
+        function miss(note) {
+            combo = 0;
+            note.element.remove();
+            note.active = false;
+            
+            document.getElementById('combo').textContent = '0';
+            showTiming('MISS!', 'miss');
+        }
+
+        function showTiming(text, className) {
+            const timingDiv = document.getElementById('timing');
+            timingDiv.textContent = text;
+            timingDiv.className = 'timing ' + className;
+            
+            setTimeout(() => {
+                timingDiv.textContent = '👆';
+                timingDiv.className = 'timing';
+            }, 300);
+        }
+
+        function startRhythm() {
+            gameActive = true;
+            gameInterval = setInterval(update, 30);
+        }
+
+        function stopRhythm() {
+            gameActive = false;
+            clearInterval(gameInterval);
+            
+            // Очищаем ноты
+            notes.forEach(n => n.element.remove());
+            notes = [];
+        }
+
+        function closeGame() {
+            tg.close();
+        }
+    </script>
+</body>
+</html>

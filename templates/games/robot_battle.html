@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Битва роботов</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #2c3e50, #4a5a6a);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        .game-container {
+            background: #4a5a6a;
+            padding: 30px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 90%;
+            max-width: 800px;
+            border: 3px solid #ffaa00;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #ffaa00;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .arena {
+            background: #2c3e50;
+            border: 4px solid #ffaa00;
+            border-radius: 20px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        .robots {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin: 30px 0;
+        }
+        .robot {
+            width: 150px;
+            height: 200px;
+            position: relative;
+        }
+        .robot-body {
+            width: 100px;
+            height: 120px;
+            background: #ffaa00;
+            border-radius: 30px;
+            margin: 0 auto;
+            position: relative;
+            border: 3px solid white;
+            transition: transform 0.3s;
+        }
+        .robot.attack .robot-body {
+            animation: attack 0.3s;
+        }
+        .robot.hit .robot-body {
+            animation: hit 0.3s;
+            background: #ff4444;
+        }
+        @keyframes attack {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(30px); }
+        }
+        @keyframes hit {
+            0%, 100% { transform: rotate(0); }
+            25% { transform: rotate(-10deg); }
+            75% { transform: rotate(10deg); }
+        }
+        .robot-head {
+            width: 60px;
+            height: 60px;
+            background: #ffaa00;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            border: 3px solid white;
+            position: relative;
+        }
+        .eye {
+            width: 15px;
+            height: 15px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 20px;
+        }
+        .eye-left { left: 10px; }
+        .eye-right { right: 10px; }
+        .health-bar {
+            width: 150px;
+            height: 20px;
+            background: #2c3e50;
+            border-radius: 10px;
+            margin: 10px auto;
+            overflow: hidden;
+            border: 2px solid #ffaa00;
+        }
+        .health-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #00ff00, #ffaa00, #ff4444);
+            transition: width 0.3s;
+        }
+        .actions {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 30px 0;
+        }
+        .action-btn {
+            background: #ffaa00;
+            color: #2c3e50;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .action-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255,170,0,0.3);
+        }
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .back-btn {
+            background: transparent;
+            color: #ffaa00;
+            border: 2px solid #ffaa00;
+        }
+        .battle-log {
+            background: #2c3e50;
+            padding: 15px;
+            border-radius: 15px;
+            min-height: 60px;
+            margin: 20px 0;
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🤖 Битва роботов</h1>
+        
+        <div class="arena">
+            <div class="robots">
+                <div class="robot" id="playerRobot">
+                    <div class="robot-head">
+                        <div class="eye eye-left"></div>
+                        <div class="eye eye-right"></div>
+                    </div>
+                    <div class="robot-body"></div>
+                    <div class="health-bar">
+                        <div class="health-fill" id="playerHealth" style="width: 100%"></div>
+                    </div>
+                    <div>Твой робот</div>
+                </div>
+                
+                <div style="font-size: 3rem;">VS</div>
+                
+                <div class="robot" id="enemyRobot">
+                    <div class="robot-head">
+                        <div class="eye eye-left"></div>
+                        <div class="eye eye-right"></div>
+                    </div>
+                    <div class="robot-body"></div>
+                    <div class="health-bar">
+                        <div class="health-fill" id="enemyHealth" style="width: 100%"></div>
+                    </div>
+                    <div>Враг</div>
+                </div>
+            </div>
+            
+            <div class="actions">
+                <button class="action-btn" onclick="attack('light')" id="lightAttack">⚡ Легкая (урон 15)</button>
+                <button class="action-btn" onclick="attack('heavy')" id="heavyAttack">💪 Тяжелая (урон 30)</button>
+                <button class="action-btn" onclick="attack('special')" id="specialAttack">✨ Особая (урон 45)</button>
+            </div>
+            
+            <div class="battle-log" id="battleLog">Начни битву!</div>
+        </div>
+        
+        <button class="action-btn" onclick="startBattle()">⚔️ Начать битву</button>
+        <button class="action-btn" onclick="resetBattle()">🔄 Новая битва</button>
+        <button class="back-btn" onclick="closeGame()">⬅️ Назад</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let playerHealth = 100;
+        let enemyHealth = 100;
+        let battleActive = false;
+        let playerTurn = true;
+        
+        const attacks = {
+            light: { damage: 15, energy: 10, accuracy: 0.9 },
+            heavy: { damage: 30, energy: 25, accuracy: 0.7 },
+            special: { damage: 45, energy: 40, accuracy: 0.5 }
+        };
+        
+        let playerEnergy = 100;
+        let enemyEnergy = 100;
+
+        function startBattle() {
+            battleActive = true;
+            playerTurn = true;
+            log('Битва началась! Твой ход!');
+            enableButtons(true);
+        }
+
+        function attack(type) {
+            if (!battleActive || !playerTurn) return;
+            
+            const attack = attacks[type];
+            
+            if (playerEnergy < attack.energy) {
+                log('Недостаточно энергии!');
+                return;
+            }
+            
+            playerTurn = false;
+            enableButtons(false);
+            
+            // Атака игрока
+            playerEnergy -= attack.energy;
+            
+            if (Math.random() < attack.accuracy) {
+                // Попадание
+                enemyHealth -= attack.damage;
+                document.getElementById('enemyRobot').classList.add('hit');
+                log(`Твоя атака попала! Урон: ${attack.damage}`);
+                
+                setTimeout(() => {
+                    document.getElementById('enemyRobot').classList.remove('hit');
+                }, 300);
+            } else {
+                log('Твоя атака промахнулась!');
+            }
+            
+            updateHealth();
+            
+            // Проверка победы
+            if (enemyHealth <= 0) {
+                battleActive = false;
+                log('🎉 ПОБЕДА! Ты уничтожил врага!');
+                enableButtons(false);
+                return;
+            }
+            
+            // Ход противника
+            setTimeout(enemyTurn, 1000);
+        }
+
+        function enemyTurn() {
+            if (!battleActive) return;
+            
+            // Выбор атаки противника
+            const attackTypes = ['light', 'heavy', 'special'];
+            const type = attackTypes[Math.floor(Math.random() * attackTypes.length)];
+            const attack = attacks[type];
+            
+            document.getElementById('playerRobot').classList.add('hit');
+            
+            if (Math.random() < attack.accuracy) {
+                playerHealth -= attack.damage;
+                log(`Враг атакует! Урон: ${attack.damage}`);
+            } else {
+                log('Враг промахнулся!');
+            }
+            
+            setTimeout(() => {
+                document.getElementById('playerRobot').classList.remove('hit');
+            }, 300);
+            
+            updateHealth();
+            
+            // Проверка поражения
+            if (playerHealth <= 0) {
+                battleActive = false;
+                log('😢 Поражение... Твой робот уничтожен');
+                enableButtons(false);
+                return;
+            }
+            
+            // Возврат хода игроку
+            playerTurn = true;
+            enableButtons(true);
+            log('Твой ход!');
+        }
+
+        function updateHealth() {
+            playerHealth = Math.max(0, playerHealth);
+            enemyHealth = Math.max(0, enemyHealth);
+            
+            document.getElementById('playerHealth').style.width = playerHealth + '%';
+            document.getElementById('enemyHealth').style.width = enemyHealth + '%';
+        }
+
+        function enableButtons(enabled) {
+            document.getElementById('lightAttack').disabled = !enabled;
+            document.getElementById('heavyAttack').disabled = !enabled;
+            document.getElementById('specialAttack').disabled = !enabled;
+        }
+
+        function log(message) {
+            document.getElementById('battleLog').textContent = message;
+        }
+
+        function resetBattle() {
+            playerHealth = 100;
+            enemyHealth = 100;
+            playerEnergy = 100;
+            enemyEnergy = 100;
+            battleActive = false;
+            playerTurn = true;
+            
+            updateHealth();
+            log('Новая битва! Нажми "Начать битву"');
+            enableButtons(false);
+        }
+
+        function closeGame() {
+            tg.close();
+        }
+    </script>
+</body>
+</html>

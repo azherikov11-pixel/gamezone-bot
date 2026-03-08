@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дуэль</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #422010, #633018);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        .game-container {
+            background: #633018;
+            padding: 30px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 90%;
+            max-width: 700px;
+            border: 3px solid #8b4513;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #d4af37;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .duel-area {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin: 40px 0;
+        }
+        .cowboy {
+            text-align: center;
+        }
+        .cowboy-emoji {
+            font-size: 5rem;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5));
+            transition: transform 0.1s;
+        }
+        .cowboy-emoji.shooting {
+            transform: translateX(20px) rotate(10deg);
+        }
+        .cowboy-emoji.hit {
+            animation: hit 0.5s;
+        }
+        @keyframes hit {
+            0%, 100% { transform: rotate(0); }
+            25% { transform: rotate(-10deg); }
+            75% { transform: rotate(10deg); }
+        }
+        .health-bar {
+            width: 150px;
+            height: 20px;
+            background: #422010;
+            border-radius: 10px;
+            margin: 10px auto;
+            overflow: hidden;
+            border: 2px solid #d4af37;
+        }
+        .health-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #e74c3c, #c0392b);
+            transition: width 0.3s;
+        }
+        .versus {
+            font-size: 3rem;
+            color: #d4af37;
+            font-weight: bold;
+        }
+        .status {
+            font-size: 1.5rem;
+            margin: 20px;
+            color: #d4af37;
+        }
+        .quickdraw {
+            margin: 30px 0;
+        }
+        #shootBtn {
+            background: #d4af37;
+            color: #422010;
+            border: none;
+            padding: 20px 50px;
+            font-size: 2rem;
+            border-radius: 50px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        #shootBtn:hover:not(:disabled) {
+            transform: scale(1.1);
+            box-shadow: 0 10px 30px rgba(212,175,55,0.5);
+        }
+        #shootBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .action-btn {
+            background: #8b4513;
+            color: #d4af37;
+            border: 2px solid #d4af37;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        .action-btn:hover {
+            background: #a0522d;
+            transform: translateY(-2px);
+        }
+        .back-btn {
+            background: transparent;
+            color: #8b4513;
+            border: 2px solid #8b4513;
+        }
+        .timer {
+            font-size: 3rem;
+            color: #d4af37;
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🤠 Дуэль</h1>
+        
+        <div class="duel-area">
+            <div class="cowboy">
+                <div class="cowboy-emoji" id="playerEmoji">🤠</div>
+                <div>Игрок</div>
+                <div class="health-bar">
+                    <div class="health-fill" id="playerHealth" style="width: 100%"></div>
+                </div>
+            </div>
+            
+            <div class="versus">VS</div>
+            
+            <div class="cowboy">
+                <div class="cowboy-emoji" id="botEmoji">👤</div>
+                <div>Противник</div>
+                <div class="health-bar">
+                    <div class="health-fill" id="botHealth" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="status" id="status">Приготовься...</div>
+        <div class="timer" id="timer">3</div>
+        
+        <div class="quickdraw">
+            <button id="shootBtn" onclick="shoot()" disabled>🔫 СТРЕЛЯЙ!</button>
+        </div>
+        
+        <button class="action-btn" onclick="startDuel()">⚔️ Начать дуэль</button>
+        <button class="action-btn" onclick="resetDuel()">🔄 Новая дуэль</button>
+        <button class="back-btn" onclick="closeGame()">⬅️ Назад</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let playerHealth = 100;
+        let botHealth = 100;
+        let duelActive = false;
+        let shootReady = false;
+        let timerInterval;
+        let countdown = 3;
+
+        function startDuel() {
+            resetDuel();
+            duelActive = true;
+            countdown = 3;
+            document.getElementById('timer').textContent = countdown;
+            document.getElementById('status').textContent = 'Приготовься...';
+            
+            timerInterval = setInterval(() => {
+                countdown--;
+                document.getElementById('timer').textContent = countdown;
+                
+                if (countdown <= 0) {
+                    clearInterval(timerInterval);
+                    shootReady = true;
+                    document.getElementById('shootBtn').disabled = false;
+                    document.getElementById('status').textContent = 'СТРЕЛЯЙ!';
+                    document.getElementById('timer').textContent = '🔫';
+                }
+            }, 1000);
+        }
+
+        function shoot() {
+            if (!shootReady) return;
+            
+            shootReady = false;
+            document.getElementById('shootBtn').disabled = true;
+            
+            // Анимация выстрела игрока
+            const playerEmoji = document.getElementById('playerEmoji');
+            playerEmoji.classList.add('shooting');
+            
+            // Случайный выстрел противника
+            const botShootTime = Math.random() * 500 + 200;
+            
+            setTimeout(() => {
+                // Выстрел противника
+                const botEmoji = document.getElementById('botEmoji');
+                botEmoji.classList.add('shooting');
+                
+                // Кто быстрее выстрелил?
+                const playerShot = true; // Игрок всегда стреляет первым (нажал кнопку)
+                
+                if (playerShot) {
+                    // Игрок попал?
+                    if (Math.random() > 0.3) {
+                        botHealth -= 30;
+                        botEmoji.classList.add('hit');
+                        document.getElementById('status').textContent = 'Попадание!';
+                    } else {
+                        document.getElementById('status').textContent = 'Мимо!';
+                    }
+                    
+                    // Противник отвечает
+                    setTimeout(() => {
+                        if (Math.random() > 0.4) {
+                            playerHealth -= 25;
+                            playerEmoji.classList.add('hit');
+                            document.getElementById('status').textContent = 'Вас ранили!';
+                        }
+                        
+                        updateHealth();
+                        checkDuelEnd();
+                        
+                        setTimeout(() => {
+                            playerEmoji.classList.remove('shooting', 'hit');
+                            botEmoji.classList.remove('shooting', 'hit');
+                            
+                            if (duelActive) {
+                                startDuel();
+                            }
+                        }, 500);
+                        
+                    }, 300);
+                    
+                }
+                
+                updateHealth();
+                
+            }, botShootTime);
+        }
+
+        function updateHealth() {
+            playerHealth = Math.max(0, playerHealth);
+            botHealth = Math.max(0, botHealth);
+            
+            document.getElementById('playerHealth').style.width = playerHealth + '%';
+            document.getElementById('botHealth').style.width = botHealth + '%';
+        }
+
+        function checkDuelEnd() {
+            if (playerHealth <= 0 && botHealth <= 0) {
+                document.getElementById('status').textContent = '🤝 Ничья!';
+                duelActive = false;
+            } else if (playerHealth <= 0) {
+                document.getElementById('status').textContent = '😢 Вы проиграли...';
+                duelActive = false;
+            } else if (botHealth <= 0) {
+                document.getElementById('status').textContent = '🎉 ПОБЕДА!';
+                duelActive = false;
+            }
+        }
+
+        function resetDuel() {
+            playerHealth = 100;
+            botHealth = 100;
+            duelActive = false;
+            shootReady = false;
+            countdown = 3;
+            
+            document.getElementById('playerHealth').style.width = '100%';
+            document.getElementById('botHealth').style.width = '100%';
+            document.getElementById('status').textContent = 'Начни дуэль';
+            document.getElementById('timer').textContent = '⚔️';
+            document.getElementById('shootBtn').disabled = true;
+            
+            clearInterval(timerInterval);
+        }
+
+        function closeGame() {
+            tg.close();
+        }
+    </script>
+</body>
+</html>

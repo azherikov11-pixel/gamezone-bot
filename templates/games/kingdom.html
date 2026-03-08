@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Королевство</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #2e5e3a, #3e7a4a);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        .game-container {
+            background: #3e7a4a;
+            padding: 30px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 90%;
+            max-width: 700px;
+            border: 3px solid #ffd700;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .kingdom-view {
+            background: #2e5e3a;
+            border: 4px solid #ffd700;
+            border-radius: 20px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        .castle {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 30px 0;
+            align-items: flex-end;
+        }
+        .tower {
+            width: 80px;
+            height: 150px;
+            background: #8b4513;
+            border-radius: 40px 40px 10px 10px;
+            position: relative;
+            border: 3px solid #ffd700;
+        }
+        .tower.roof {
+            width: 100px;
+            height: 50px;
+            background: #ffd700;
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            margin-top: -25px;
+        }
+        .wall {
+            width: 200px;
+            height: 100px;
+            background: #a0522d;
+            border-radius: 20px 20px 0 0;
+            border: 3px solid #ffd700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+        .resources {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            font-size: 1.3rem;
+        }
+        .resource {
+            background: #2e5e3a;
+            padding: 10px 20px;
+            border-radius: 15px;
+            border: 2px solid #ffd700;
+        }
+        .buildings {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 30px 0;
+        }
+        .building {
+            background: #8b4513;
+            border: 2px solid #ffd700;
+            border-radius: 15px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .building:hover:not(.disabled) {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+        .building.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .building.owned {
+            border-color: #00ff00;
+            background: #9b6b3b;
+        }
+        .action-btn {
+            background: #ffd700;
+            color: #2e5e3a;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255,215,0,0.3);
+        }
+        .back-btn {
+            background: transparent;
+            color: #ffd700;
+            border: 2px solid #ffd700;
+        }
+        .population {
+            font-size: 1.5rem;
+            color: #ffd700;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>👑 Королевство</h1>
+        
+        <div class="kingdom-view">
+            <div class="castle">
+                <div class="tower"></div>
+                <div class="wall" id="wallLevel">🏰</div>
+                <div class="tower"></div>
+            </div>
+            
+            <div class="resources">
+                <div class="resource">💰 Золото: <span id="gold">100</span></div>
+                <div class="resource">🪵 Древесина: <span id="wood">50</span></div>
+                <div class="resource">⛓️ Камень: <span id="stone">30</span></div>
+            </div>
+            
+            <div class="population">👥 Население: <span id="population">10</span></div>
+            
+            <div class="buildings">
+                <div class="building" onclick="build('house')" id="house">
+                    <div>🏠 Дом</div>
+                    <div>+5 жителей</div>
+                    <div>50💰 30🪵</div>
+                </div>
+                <div class="building" onclick="build('farm')" id="farm">
+                    <div>🌾 Ферма</div>
+                    <div>+10💰/ход</div>
+                    <div>40💰 40🪵</div>
+                </div>
+                <div class="building" onclick="build('mine')" id="mine">
+                    <div>⛏️ Шахта</div>
+                    <div>+5⛓️/ход</div>
+                    <div>60💰 20⛓️</div>
+                </div>
+                <div class="building" onclick="build('wall')" id="wall">
+                    <div>🧱 Стена</div>
+                    <div>Защита +10</div>
+                    <div>100💰 50⛓️</div>
+                </div>
+                <div class="building" onclick="build('tavern')" id="tavern">
+                    <div>🍺 Таверна</div>
+                    <div>+2💰/житель</div>
+                    <div>80💰 40🪵</div>
+                </div>
+                <div class="building" onclick="build('castle')" id="castle">
+                    <div>👑 Замок</div>
+                    <div>Уровень 1</div>
+                    <div>200💰 100⛓️</div>
+                </div>
+            </div>
+        </div>
+        
+        <button class="action-btn" onclick="nextTurn()">⏭️ Следующий ход</button>
+        <button class="action-btn" onclick="resetKingdom()">🔄 Новое королевство</button>
+        <button class="back-btn" onclick="closeGame()">⬅️ Назад</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let gold = 100;
+        let wood = 50;
+        let stone = 30;
+        let population = 10;
+        let turn = 1;
+        
+        let buildings = {
+            house: 0,
+            farm: 0,
+            mine: 0,
+            wall: 0,
+            tavern: 0,
+            castle: 1
+        };
+
+        function build(type) {
+            const costs = {
+                house: { gold: 50, wood: 30, stone: 0 },
+                farm: { gold: 40, wood: 40, stone: 0 },
+                mine: { gold: 60, wood: 0, stone: 20 },
+                wall: { gold: 100, wood: 0, stone: 50 },
+                tavern: { gold: 80, wood: 40, stone: 20 },
+                castle: { gold: 200, wood: 100, stone: 100 }
+            };
+            
+            const cost = costs[type];
+            
+            if (gold < cost.gold || wood < cost.wood || stone < cost.stone) {
+                alert('Не хватает ресурсов!');
+                return;
+            }
+            
+            gold -= cost.gold;
+            wood -= cost.wood;
+            stone -= cost.stone;
+            
+            buildings[type]++;
+            
+            if (type === 'house') {
+                population += 5;
+            }
+            
+            updateDisplay();
+            checkAchievements();
+        }
+
+        function nextTurn() {
+            turn++;
+            
+            // Доход от ферм
+            gold += buildings.farm * 10;
+            
+            // Доход от шахт
+            stone += buildings.mine * 5;
+            
+            // Доход от таверн
+            gold += buildings.tavern * (population * 2);
+            
+            // Рост населения
+            population += buildings.house * 2;
+            
+            updateDisplay();
+            
+            // Случайное событие
+            if (Math.random() < 0.3) {
+                randomEvent();
+            }
+        }
+
+        function randomEvent() {
+            const events = [
+                { text: '💰 Найдена золотая жила! +50 золота', gold: 50 },
+                { text: '🌾 Урожайный год! +30 еды', wood: 30 },
+                { text: '⛓️ Обвал в шахте... -20 камня', stone: -20 },
+                { text: '👥 Новые поселенцы! +10 населения', population: 10 },
+                { text: '🏴‍☠️ Нападение разбойников! -100 золота', gold: -100 }
+            ];
+            
+            const event = events[Math.floor(Math.random() * events.length)];
+            
+            if (event.gold) gold = Math.max(0, gold + event.gold);
+            if (event.wood) wood = Math.max(0, wood + event.wood);
+            if (event.stone) stone = Math.max(0, stone + event.stone);
+            if (event.population) population += event.population;
+            
+            alert(`Событие: ${event.text}`);
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            document.getElementById('gold').textContent = gold;
+            document.getElementById('wood').textContent = wood;
+            document.getElementById('stone').textContent = stone;
+            document.getElementById('population').textContent = population;
+            
+            // Обновление стен
+            if (buildings.wall > 0) {
+                document.getElementById('wallLevel').textContent = '🧱'.repeat(Math.min(buildings.wall, 5));
+            }
+        }
+
+        function checkAchievements() {
+            if (buildings.castle >= 5) {
+                alert('👑 ПОЗДРАВЛЯЮ! Ты построил великий замок!');
+            }
+            
+            if (population >= 100) {
+                alert('🏙️ Твое поселение стало городом!');
+            }
+        }
+
+        function resetKingdom() {
+            gold = 100;
+            wood = 50;
+            stone = 30;
+            population = 10;
+            turn = 1;
+            
+            buildings = {
+                house: 0,
+                farm: 0,
+                mine: 0,
+                wall: 0,
+                tavern: 0,
+                castle: 1
+            };
+            
+            updateDisplay();
+        }
+
+        function closeGame() {
+            tg.close();
+        }
+    </script>
+</body>
+</html>

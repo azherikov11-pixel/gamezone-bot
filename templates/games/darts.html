@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дартс: Битва с ботом</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1e24, #2a2f3a);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        .game-container {
+            background: #242a32;
+            padding: 30px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 90%;
+            max-width: 900px;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #fff, #8b9dc3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .battle-info {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+            font-size: 1.5rem;
+        }
+        .player-info {
+            color: #4ecdc4;
+        }
+        .bot-info {
+            color: #ff6b6b;
+        }
+        .game-area {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .dartboard-container {
+            position: relative;
+            width: 400px;
+            height: 400px;
+        }
+        #dartboard {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #2a5a3a, #1a3a2a);
+            border: 8px solid #8b4513;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative;
+            cursor: crosshair;
+        }
+        .score-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid rgba(255,215,0,0.3);
+        }
+        .ring-1 { top: 20px; left: 20px; right: 20px; bottom: 20px; border: 3px solid #ffd700; }
+        .ring-2 { top: 60px; left: 60px; right: 60px; bottom: 60px; border: 2px solid #ff6b6b; }
+        .ring-3 { top: 100px; left: 100px; right: 100px; bottom: 100px; border: 2px solid #4ecdc4; }
+        .ring-4 { top: 140px; left: 140px; right: 140px; bottom: 140px; border: 2px solid #45b7d1; }
+        .ring-bullseye { 
+            position: absolute;
+            top: 190px;
+            left: 190px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #ff0000, #8b0000);
+            border: 2px solid #ffd700;
+            box-shadow: 0 0 20px #ff0000;
+        }
+        .ring-super-bullseye {
+            position: absolute;
+            top: 195px;
+            left: 195px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ffffff;
+            border: 2px solid #ffd700;
+            box-shadow: 0 0 30px #ffffff;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .stats {
+            background: #1a1e24;
+            padding: 20px;
+            border-radius: 20px;
+            min-width: 250px;
+        }
+        .score {
+            font-size: 2rem;
+            margin: 10px 0;
+        }
+        .player-score { color: #4ecdc4; }
+        .bot-score { color: #ff6b6b; }
+        .turn-indicator {
+            font-size: 1.2rem;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        .player-turn { background: rgba(78, 205, 196, 0.3); }
+        .bot-turn { background: rgba(255, 107, 107, 0.3); }
+        .action-btn {
+            background: #8b9dc3;
+            color: #1a1e24;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1rem;
+            border-radius: 25px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .action-btn:hover:not(:disabled) {
+            background: #aab9d4;
+            transform: translateY(-2px);
+        }
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #throwBtn {
+            background: #ffd700;
+            width: 100%;
+        }
+        .back-btn {
+            background: transparent;
+            color: #8b9dc3;
+            border: 2px solid #8b9dc3;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🎯 Дартс: Битва с ботом</h1>
+        
+        <div class="battle-info">
+            <div class="player-info">👤 Игрок: <span id="playerScore">0</span></div>
+            <div class="bot-info">🤖 Бот: <span id="botScore">0</span></div>
+        </div>
+        
+        <div class="turn-indicator" id="turnIndicator">Твой ход!</div>
+        
+        <div class="game-area">
+            <div class="dartboard-container">
+                <div id="dartboard">
+                    <div class="score-ring ring-1"></div>
+                    <div class="score-ring ring-2"></div>
+                    <div class="score-ring ring-3"></div>
+                    <div class="score-ring ring-4"></div>
+                    <div class="ring-bullseye"></div>
+                    <div class="ring-super-bullseye"></div>
+                </div>
+                <canvas id="dartsCanvas" width="400" height="400"></canvas>
+            </div>
+            
+            <div class="stats">
+                <div>Твой последний бросок: <span id="lastPlayerThrow">-</span></div>
+                <div>Бросок бота: <span id="lastBotThrow">-</span></div>
+                <div style="margin: 20px 0;">Раунд: <span id="round">1</span>/5</div>
+                
+                <button class="action-btn" id="throwBtn" onclick="playerThrow()" disabled>🎯 Мой ход!</button>
+                <button class="action-btn" onclick="resetGame()">🔄 Новая игра</button>
+                <button class="back-btn" onclick="closeGame()">⬅️ Назад</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let playerScore = 0;
+        let botScore = 0;
+        let currentRound = 1;
+        let isPlayerTurn = true;
+        let darts = [];
+        let animationId = null;
+        
+        const canvas = document.getElementById('dartsCanvas');
+        const ctx = canvas.getContext('2d');
+        const board = document.getElementById('dartboard');
+
+        function getPoints(x, y) {
+            const dx = x - 200;
+            const dy = y - 200;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance <= 5) return 100; // Супер-яблочко
+            if (distance <= 20) return 50;  // Яблочко
+            if (distance <= 60) return 25;
+            if (distance <= 100) return 15;
+            if (distance <= 140) return 10;
+            if (distance <= 180) return 5;
+            return 0;
+        }
+
+        class Dart {
+            constructor(targetX, targetY, isPlayer) {
+                this.startX = 200;
+                this.startY = 380;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.x = this.startX;
+                this.y = this.startY;
+                this.progress = 0;
+                this.speed = 0.03;
+                this.stuck = false;
+                this.isPlayer = isPlayer;
+                
+                const dx = targetX - this.startX;
+                const dy = targetY - this.startY;
+                this.angle = Math.atan2(dy, dx);
+            }
+            
+            update() {
+                if (this.stuck) return;
+                
+                this.progress += this.speed;
+                
+                if (this.progress >= 1) {
+                    this.stuck = true;
+                    this.progress = 1;
+                }
+                
+                this.x = this.startX + (this.targetX - this.startX) * this.progress;
+                this.y = this.startY + (this.targetY - this.startY) * this.progress;
+            }
+            
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                
+                ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                ctx.shadowBlur = 10;
+                
+                // Острие
+                ctx.fillStyle = this.isPlayer ? '#4ecdc4' : '#ff6b6b';
+                ctx.beginPath();
+                ctx.moveTo(20, -3);
+                ctx.lineTo(30, 0);
+                ctx.lineTo(20, 3);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Тело
+                ctx.fillStyle = '#8b4513';
+                ctx.fillRect(-15, -2, 30, 4);
+                
+                // Оперение
+                ctx.fillStyle = this.isPlayer ? '#4ecdc4' : '#ff6b6b';
+                ctx.beginPath();
+                ctx.moveTo(-20, -5);
+                ctx.lineTo(-25, 0);
+                ctx.lineTo(-20, 5);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.restore();
+            }
+        }
+
+        function playerThrow() {
+            if (!isPlayerTurn || currentRound > 5) return;
+            
+            document.getElementById('throwBtn').disabled = true;
+            isPlayerTurn = false;
+            document.getElementById('turnIndicator').textContent = 'Ход бота...';
+            document.getElementById('turnIndicator').className = 'turn-indicator bot-turn';
+        }
+
+        board.addEventListener('click', (event) => {
+            if (!isPlayerTurn || currentRound > 5) return;
+            
+            const rect = board.getBoundingClientRect();
+            const scaleX = 400 / rect.width;
+            const scaleY = 400 / rect.height;
+            const x = (event.clientX - rect.left) * scaleX;
+            const y = (event.clientY - rect.top) * scaleY;
+            
+            const points = getPoints(x, y);
+            playerScore += points;
+            
+            document.getElementById('playerScore').textContent = playerScore;
+            document.getElementById('lastPlayerThrow').textContent = points;
+            
+            const dart = new Dart(x, y, true);
+            darts.push(dart);
+            
+            if (!animationId) {
+                animate();
+            }
+            
+            isPlayerTurn = false;
+            document.getElementById('throwBtn').disabled = true;
+            document.getElementById('turnIndicator').textContent = 'Ход бота...';
+            document.getElementById('turnIndicator').className = 'turn-indicator bot-turn';
+            
+            setTimeout(botThrow, 1000);
+        });
+
+        function botThrow() {
+            const targetX = 200 + (Math.random() - 0.5) * 150;
+            const targetY = 200 + (Math.random() - 0.5) * 150;
+            
+            const points = getPoints(targetX, targetY);
+            botScore += points;
+            
+            document.getElementById('botScore').textContent = botScore;
+            document.getElementById('lastBotThrow').textContent = points;
+            
+            const dart = new Dart(targetX, targetY, false);
+            darts.push(dart);
+            
+            if (!animationId) {
+                animate();
+            }
+            
+            currentRound++;
+            document.getElementById('round').textContent = currentRound;
+            
+            if (currentRound <= 5) {
+                isPlayerTurn = true;
+                document.getElementById('turnIndicator').textContent = 'Твой ход!';
+                document.getElementById('turnIndicator').className = 'turn-indicator player-turn';
+                document.getElementById('throwBtn').disabled = false;
+            } else {
+                endGame();
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, 400, 400);
+            
+            let allStuck = true;
+            
+            darts.forEach(dart => {
+                dart.update();
+                dart.draw();
+                if (!dart.stuck) allStuck = false;
+            });
+            
+            if (!allStuck) {
+                animationId = requestAnimationFrame(animate);
+            } else {
+                animationId = null;
+            }
+        }
+
+        function endGame() {
+            if (playerScore > botScore) {
+                alert(`🎉 ПОБЕДА! Твой счет: ${playerScore}, Бот: ${botScore}`);
+            } else if (playerScore < botScore) {
+                alert(`😢 Поражение... Твой счет: ${playerScore}, Бот: ${botScore}`);
+            } else {
+                alert(`🤝 Ничья! Твой счет: ${playerScore}, Бот: ${botScore}`);
+            }
+        }
+
+        function resetGame() {
+            playerScore = 0;
+            botScore = 0;
+            currentRound = 1;
+            isPlayerTurn = true;
+            darts = [];
+            
+            document.getElementById('playerScore').textContent = '0';
+            document.getElementById('botScore').textContent = '0';
+            document.getElementById('lastPlayerThrow').textContent = '-';
+            document.getElementById('lastBotThrow').textContent = '-';
+            document.getElementById('round').textContent = '1';
+            document.getElementById('turnIndicator').textContent = 'Твой ход!';
+            document.getElementById('turnIndicator').className = 'turn-indicator player-turn';
+            document.getElementById('throwBtn').disabled = false;
+            
+            ctx.clearRect(0, 0, 400, 400);
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+        }
+
+        function closeGame() {
+            tg.close();
+        }
+    </script>
+</body>
+</html>

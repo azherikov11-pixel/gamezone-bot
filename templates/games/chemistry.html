@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Химия: Соедини элементы</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a3a4a, #2a4a5a);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        .game-container {
+            background: #2a4a5a;
+            padding: 30px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 90%;
+            max-width: 700px;
+            border: 3px solid #4ecdc4;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #4ecdc4;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .lab {
+            background: #1a3a4a;
+            border: 4px solid #4ecdc4;
+            border-radius: 20px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        .target-formula {
+            font-size: 2rem;
+            color: #ffd700;
+            margin: 20px 0;
+            padding: 20px;
+            background: #2a4a5a;
+            border-radius: 15px;
+            border: 2px solid #4ecdc4;
+        }
+        .elements-pool {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 30px 0;
+            padding: 20px;
+            background: #2a4a5a;
+            border-radius: 15px;
+        }
+        .element {
+            width: 90px;
+            height: 90px;
+            background: #4ecdc4;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #1a3a4a;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 3px solid white;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        .element-count {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #ffd700;
+            color: #1a3a4a;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        .element.selected {
+            transform: scale(1.1);
+            box-shadow: 0 0 30px #ffd700;
+            border-color: #ffd700;
+            background: #ffd700;
+        }
+        .element.disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        .element:hover:not(.disabled) {
+            transform: scale(1.05);
+        }
+        .reaction-area {
+            min-height: 100px;
+            background: #2a4a5a;
+            border: 2px dashed #4ecdc4;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .reaction-item {
+            background: #4ecdc4;
+            padding: 15px 25px;
+            border-radius: 30px;
+            color: #1a3a4a;
+            font-weight: bold;
+            animation: popIn 0.3s;
+            font-size: 1.3rem;
+            cursor: pointer;
+            border: 2px solid white;
+        }
+        .reaction-item:hover {
+            background: #ffd700;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0); }
+            80% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .score {
+            font-size: 2rem;
+            color: #ffd700;
+            margin: 10px 0;
+        }
+        .action-btn {
+            background: #4ecdc4;
+            color: #1a3a4a;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        .action-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(78,205,196,0.3);
+        }
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .clear-btn {
+            background: #e74c3c;
+            color: white;
+        }
+        .back-btn {
+            background: transparent;
+            color: #4ecdc4;
+            border: 2px solid #4ecdc4;
+        }
+        .success-message {
+            color: #ffd700;
+            font-size: 1.5rem;
+            animation: pulse 1s infinite;
+            margin: 10px 0;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        .formula-display {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            font-size: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🧪 Химическая лаборатория</h1>
+        
+        <div class="lab">
+            <div class="score">🧬 Очки: <span id="score">0</span></div>
+            
+            <div class="target-formula" id="targetFormula">
+                <div>Цель:</div>
+                <div class="formula-display" id="formulaDisplay">H₂O</div>
+            </div>
+            
+            <div class="elements-pool" id="elementsPool"></div>
+            
+            <div class="reaction-area" id="reaction">
+                <span style="color: #a0aaba;">Выбери элементы для реакции</span>
+            </div>
+            
+            <div>
+                <button class="action-btn" onclick="combine()" id="combineBtn" disabled>⚗️ Провести реакцию</button>
+                <button class="action-btn clear-btn" onclick="clearSelection()">🧹 Очистить</button>
+            </div>
+            
+            <div id="nextLevel" style="display: none;">
+                <button class="action-btn" onclick="nextLevel()">➡️ Следующий уровень</button>
+            </div>
+        </div>
+        
+        <button class="action-btn" onclick="resetChemistry()">🔄 Новая игра</button>
+        <button class="back-btn" onclick="closeGame()">⬅️ Назад</button>
+        
+        <div id="message" class="success-message" style="display: none;"></div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let score = 0;
+        let selectedElements = [];
+        let currentLevel = 0;
+        
+        const elements = [
+            { symbol: 'H', name: 'Водород', emoji: '💧', count: 5, maxCount: 5 },
+            { symbol: 'O', name: 'Кислород', emoji: '🌬️', count: 5, maxCount: 5 },
+            { symbol: 'C', name: 'Углерод', emoji: '⚫', count: 4, maxCount: 4 },
+            { symbol: 'N', name: 'Азот', emoji: '🍃', count: 4, maxCount: 4 },
+            { symbol: 'Na', name: 'Натрий', emoji: '🧂', count: 3, maxCount: 3 },
+            { symbol: 'Cl', name: 'Хлор', emoji: '🧪', count: 3, maxCount: 3 }
+        ];
+        
+        const reactions = [
+            { formula: 'H₂O', elements: ['H', 'H', 'O'], name: 'Вода', points: 10, emoji: '💧' },
+            { formula: 'CO₂', elements: ['C', 'O', 'O'], name: 'Углекислый газ', points: 15, emoji: '🌫️' },
+            { formula: 'NaCl', elements: ['Na', 'Cl'], name: 'Соль', points: 20, emoji: '🧂' },
+            { formula: 'NH₃', elements: ['N', 'H', 'H', 'H'], name: 'Аммиак', points: 25, emoji: '🧪' },
+            { formula: 'CH₄', elements: ['C', 'H', 'H', 'H', 'H'], name: 'Метан', points: 30, emoji: '🔥' },
+            { formula: 'H₂O₂', elements: ['H', 'H', 'O', 'O'], name: 'Перекись водорода', points: 35, emoji: '💊' }
+        ];
+
+        function renderElements() {
+            const pool = document.getElementById('elementsPool');
+            pool.innerHTML = '';
+            
+            elements.forEach((element, index) => {
+                const el = document.createElement('div');
+                el.className = 'element';
+                el.setAttribute('data-symbol', element.symbol);
+                el.setAttribute('data-index', index);
+                
+                if (element.count === 0) {
+                    el.classList.add('disabled');
+                }
+                
+                el.innerHTML = `
+                    <div>${element.emoji}</div>
+                    <div>${element.symbol}</div>
+                    <div class="element-count">${element.count}</div>
+                `;
+                
+                el.onclick = () => selectElement(index);
+                
+                pool.appendChild(el);
+            });
+        }
+
+        function selectElement(index) {
+            const element = elements[index];
+            
+            if (element.count <= 0) {
+                showMessage('Этот элемент закончился!', 'error');
+                return;
+            }
+            
+            if (selectedElements.length >= 6) {
+                showMessage('Слишком много элементов!', 'error');
+                return;
+            }
+            
+            // Уменьшаем количество
+            element.count--;
+            
+            // Добавляем в выбранные
+            selectedElements.push({
+                symbol: element.symbol,
+                index: index
+            });
+            
+            // Обновляем отображение
+            renderElements();
+            updateReaction();
+            updateCombineButton();
+        }
+
+        function updateReaction() {
+            const reaction = document.getElementById('reaction');
+            reaction.innerHTML = '';
+            
+            if (selectedElements.length === 0) {
+                reaction.innerHTML = '<span style="color: #a0aaba;">Выбери элементы для реакции</span>';
+                return;
+            }
+            
+            selectedElements.forEach((item, index) => {
+                const el = document.createElement('div');
+                el.className = 'reaction-item';
+                el.textContent = item.symbol;
+                el.onclick = () => removeFromSelection(index);
+                el.title = 'Нажми, чтобы убрать';
+                reaction.appendChild(el);
+            });
+        }
+
+        function removeFromSelection(index) {
+            const item = selectedElements[index];
+            
+            // Возвращаем элемент
+            elements[item.index].count++;
+            
+            // Удаляем из выбранных
+            selectedElements.splice(index, 1);
+            
+            // Обновляем
+            renderElements();
+            updateReaction();
+            updateCombineButton();
+        }
+
+        function updateCombineButton() {
+            const combineBtn = document.getElementById('combineBtn');
+            combineBtn.disabled = selectedElements.length === 0;
+        }
+
+        function combine() {
+            const target = reactions[currentLevel];
+            
+            // Сортируем для сравнения
+            const selected = selectedElements.map(item => item.symbol).sort().join('');
+            const required = [...target.elements].sort().join('');
+            
+            if (selected === required) {
+                // Успех
+                score += target.points;
+                document.getElementById('score').textContent = score;
+                
+                showMessage(`🎉 Успех! Получено: ${target.name} ${target.emoji} +${target.points}`, 'success');
+                
+                // Очищаем выбранные элементы (они использованы)
+                selectedElements = [];
+                
+                // Показываем кнопку следующего уровня
+                document.getElementById('nextLevel').style.display = 'block';
+                document.getElementById('combineBtn').disabled = true;
+                
+                // Обновляем отображение
+                updateReaction();
+                
+                // Вибрация
+                if (navigator.vibrate) {
+                    navigator.vibrate([100, 50, 100]);
+                }
+            } else {
+                // Неудача - возвращаем элементы
+                showMessage('😢 Реакция не идет... Элементы возвращены', 'error');
+                
+                // Возвращаем все элементы
+                selectedElements.forEach(item => {
+                    elements[item.index].count++;
+                });
+                
+                selectedElements = [];
+                
+                // Обновляем
+                renderElements();
+                updateReaction();
+                
+                if (navigator.vibrate) {
+                    navigator.vibrate(200);
+                }
+            }
+            
+            updateCombineButton();
+        }
+
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.style.display = 'block';
+            msg.style.color = type === 'success' ? '#ffd700' : '#e74c3c';
+            
+            setTimeout(() => msg.style.display = 'none', 2000);
+        }
+
+        function nextLevel() {
+            currentLevel = (currentLevel + 1) % reactions.length;
+            
+            // Обновляем отображение формулы
+            const formula = reactions[currentLevel].formula;
+            const formulaDisplay = document.getElementById('formulaDisplay');
+            
+            // Красивое отображение формул
+            let displayHtml = '';
+            for (let char of formula) {
+                if (char.match(/[0-9]/)) {
+                    displayHtml += `<sub>${char}</sub>`;
+                } else {
+                    displayHtml += char;
+                }
+            }
+            formulaDisplay.innerHTML = displayHtml;
+            
+            document.getElementById('nextLevel').style.display = 'none';
+            updateCombineButton();
+            
+            showMessage(`Новая цель: ${reactions[currentLevel].name}`, 'success');
+        }
+
+        function clearSelection() {
+            // Возвращаем все элементы
+            selectedElements.forEach(item => {
+                elements[item.index].count++;
+            });
+            
+            selectedElements = [];
+            
+            // Обновляем
+            renderElements();
+            updateReaction();
+            updateCombineButton();
+        }
+
+        function resetChemistry() {
+            // Восстанавливаем все счетчики
+            elements.forEach((element, index) => {
+                element.count = [5, 5, 4, 4, 3, 3][index];
+            });
+            
+            score = 0;
+            selectedElements = [];
+            currentLevel = 0;
+            
+            document.getElementById('score').textContent = '0';
+            document.getElementById('formulaDisplay').innerHTML = 'H₂O';
+            document.getElementById('nextLevel').style.display = 'none';
+            
+            renderElements();
+            updateReaction();
+            updateCombineButton();
+        }
+
+        function closeGame() {
+            tg.close();
+        }
+
+        // Инициализация
+        renderElements();
+        updateCombineButton();
+    </script>
+</body>
+</html>

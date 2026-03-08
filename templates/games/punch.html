@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Удар силой</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        .game-container {
+            background: #34495e;
+            padding: 30px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 90%;
+            max-width: 600px;
+            border: 3px solid #e74c3c;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #e74c3c;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .boxing-ring {
+            background: #2c3e50;
+            border: 4px solid #e74c3c;
+            border-radius: 20px;
+            padding: 40px;
+            margin: 20px 0;
+            position: relative;
+        }
+        .punching-bag {
+            width: 150px;
+            height: 200px;
+            margin: 0 auto;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .bag-top {
+            width: 100%;
+            height: 30px;
+            background: #95a5a6;
+            border-radius: 15px 15px 0 0;
+            border: 2px solid #7f8c8d;
+        }
+        .bag-body {
+            width: 100%;
+            height: 140px;
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            border-radius: 20px;
+            position: relative;
+            border: 2px solid #7f8c8d;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+        .bag-bottom {
+            width: 100%;
+            height: 30px;
+            background: #95a5a6;
+            border-radius: 0 0 15px 15px;
+            border: 2px solid #7f8c8d;
+        }
+        .chain {
+            width: 4px;
+            height: 50px;
+            background: #7f8c8d;
+            margin: 0 auto;
+        }
+        .power-meter {
+            background: #2c3e50;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+        .meter-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+        .meter-bar {
+            width: 100%;
+            height: 40px;
+            background: #34495e;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 2px solid #e74c3c;
+        }
+        .meter-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #f1c40f, #e74c3c, #c0392b);
+            transition: width 0.1s;
+        }
+        .hit-counter {
+            font-size: 2rem;
+            margin: 20px 0;
+            color: #f1c40f;
+        }
+        .combo {
+            font-size: 1.5rem;
+            color: #e74c3c;
+            animation: pulse 0.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        .bag-punch {
+            animation: punch 0.2s ease-out;
+        }
+        @keyframes punch {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-20px) rotate(-5deg); }
+            50% { transform: translateX(20px) rotate(5deg); }
+            75% { transform: translateX(-10px) rotate(-2deg); }
+            100% { transform: translateX(0); }
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            font-size: 1.2rem;
+        }
+        .action-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(231,76,60,0.3);
+        }
+        .back-btn {
+            background: transparent;
+            color: #e74c3c;
+            border: 2px solid #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🥊 Удар силой</h1>
+        
+        <div class="boxing-ring">
+            <div class="chain"></div>
+            <div class="punching-bag" id="bag" onclick="punch()">
+                <div class="bag-top"></div>
+                <div class="bag-body"></div>
+                <div class="bag-bottom"></div>
+            </div>
+        </div>
+        
+        <div class="power-meter">
+            <div class="meter-label">
+                <span>Сила удара</span>
+                <span id="powerValue">0</span>
+            </div>
+            <div class="meter-bar">
+                <div class="meter-fill" id="powerFill"></div>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <div>Ударов: <span id="hitCount">0</span></div>
+            <div class="combo" id="comboDisplay">🔥 <span id="comboCount">0</span></div>
+        </div>
+        
+        <div class="hit-counter" id="totalPower">Общая сила: 0</div>
+        
+        <button class="action-btn" onclick="resetPunch()">🔄 Сброс</button>
+        <button class="back-btn" onclick="closeGame()">⬅️ Назад</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let hitCount = 0;
+        let combo = 0;
+        let totalPower = 0;
+        let lastHitTime = 0;
+        let powerInterval;
+        let currentPower = 0;
+
+        function startPowerMeter() {
+            if (powerInterval) clearInterval(powerInterval);
+            currentPower = 0;
+            let increasing = true;
+            
+            powerInterval = setInterval(() => {
+                if (increasing) {
+                    currentPower += 2;
+                    if (currentPower >= 100) increasing = false;
+                } else {
+                    currentPower -= 2;
+                    if (currentPower <= 0) increasing = true;
+                }
+                document.getElementById('powerFill').style.width = currentPower + '%';
+                document.getElementById('powerValue').textContent = currentPower;
+            }, 30);
+        }
+
+        function punch() {
+            const now = Date.now();
+            
+            // Проверка комбо (удар в течение 1 секунды)
+            if (now - lastHitTime < 1000) {
+                combo++;
+            } else {
+                combo = 1;
+            }
+            lastHitTime = now;
+            
+            // Анимация удара
+            const bag = document.getElementById('bag');
+            bag.classList.add('bag-punch');
+            setTimeout(() => bag.classList.remove('bag-punch'), 200);
+            
+            // Расчет силы удара
+            const punchPower = Math.floor(currentPower * (1 + combo * 0.1));
+            hitCount++;
+            totalPower += punchPower;
+            
+            // Обновление дисплея
+            document.getElementById('hitCount').textContent = hitCount;
+            document.getElementById('comboCount').textContent = combo;
+            document.getElementById('totalPower').textContent = `Общая сила: ${totalPower}`;
+            
+            // Визуальный эффект
+            if (combo >= 3) {
+                document.getElementById('comboDisplay').style.color = '#f1c40f';
+            } else if (combo >= 5) {
+                document.getElementById('comboDisplay').style.color = '#e74c3c';
+            }
+            
+            // Вибрация на мобильных (если поддерживается)
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+        }
+
+        function resetPunch() {
+            hitCount = 0;
+            combo = 0;
+            totalPower = 0;
+            lastHitTime = 0;
+            
+            document.getElementById('hitCount').textContent = '0';
+            document.getElementById('comboCount').textContent = '0';
+            document.getElementById('totalPower').textContent = 'Общая сила: 0';
+            document.getElementById('comboDisplay').style.color = '#e74c3c';
+        }
+
+        function closeGame() {
+            tg.close();
+        }
+
+        // Запускаем измеритель силы
+        startPowerMeter();
+    </script>
+</body>
+</html>

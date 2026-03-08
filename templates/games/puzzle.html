@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пазл дня</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1e24, #2a2f3a);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        .game-container {
+            background: #242a32;
+            padding: 30px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 90%;
+            max-width: 500px;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #fff, #8b9dc3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .puzzle-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin: 20px 0;
+            background: #1a1e24;
+            padding: 10px;
+            border-radius: 15px;
+        }
+        .puzzle-piece {
+            aspect-ratio: 1;
+            background: #8b9dc3;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: #1a1e24;
+        }
+        .puzzle-piece.empty {
+            background: #3a404a;
+            cursor: default;
+        }
+        .puzzle-piece:hover:not(.empty) {
+            transform: scale(0.95);
+            background: #aab9d4;
+        }
+        .moves {
+            font-size: 1.5rem;
+            color: #8b9dc3;
+            margin: 20px 0;
+        }
+        button {
+            background: #8b9dc3;
+            color: #1a1e24;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px;
+        }
+        button:hover {
+            background: #aab9d4;
+            transform: translateY(-2px);
+        }
+        .back-btn {
+            background: transparent;
+            color: #8b9dc3;
+            border: 2px solid #8b9dc3;
+        }
+        .victory {
+            color: #4caf50;
+            font-size: 1.2rem;
+            margin: 10px 0;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🧩 Пазл дня</h1>
+        <p>Собери картинку (3x3)</p>
+        
+        <div class="puzzle-grid" id="puzzle"></div>
+        
+        <div class="moves">Ходов: <span id="moves">0</span></div>
+        <div id="victoryMessage" style="display: none;" class="victory">🎉 ПОБЕДА! 🎉</div>
+        
+        <button onclick="newGame()">🔄 Новая игра</button>
+        <button class="back-btn" onclick="closeGame()">⬅️ Назад</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        let puzzle = [];
+        let emptyPos = { row: 2, col: 2 };
+        let moves = 0;
+        const size = 3;
+
+        function initPuzzle() {
+            // Создаем перемешанный пазл
+            puzzle = [];
+            for (let i = 0; i < size; i++) {
+                puzzle[i] = [];
+                for (let j = 0; j < size; j++) {
+                    puzzle[i][j] = i * size + j + 1;
+                }
+            }
+            puzzle[size-1][size-1] = 0; // Пустая клетка
+            
+            // Перемешиваем
+            for (let i = 0; i < 100; i++) {
+                const moves = getPossibleMoves();
+                const randomMove = moves[Math.floor(Math.random() * moves.length)];
+                movePiece(randomMove.row, randomMove.col, false);
+            }
+            
+            render();
+        }
+
+        function getPossibleMoves() {
+            const moves = [];
+            const dirs = [[-1,0], [1,0], [0,-1], [0,1]];
+            
+            for (let [dr, dc] of dirs) {
+                const newRow = emptyPos.row + dr;
+                const newCol = emptyPos.col + dc;
+                if (newRow >= 0 && newRow < size && newCol >= 0 && newCol < size) {
+                    moves.push({ row: newRow, col: newCol });
+                }
+            }
+            return moves;
+        }
+
+        function movePiece(row, col, countMove = true) {
+            if (Math.abs(row - emptyPos.row) + Math.abs(col - emptyPos.col) !== 1) return false;
+            
+            // Меняем местами
+            puzzle[emptyPos.row][emptyPos.col] = puzzle[row][col];
+            puzzle[row][col] = 0;
+            emptyPos = { row, col };
+            
+            if (countMove) {
+                moves++;
+                document.getElementById('moves').textContent = moves;
+            }
+            
+            render();
+            checkVictory();
+            return true;
+        }
+
+        function checkVictory() {
+            let correct = true;
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    const expected = i * size + j + 1;
+                    if (i === size-1 && j === size-1) continue;
+                    if (puzzle[i][j] !== expected) {
+                        correct = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (correct) {
+                document.getElementById('victoryMessage').style.display = 'block';
+            } else {
+                document.getElementById('victoryMessage').style.display = 'none';
+            }
+        }
+
+        function render() {
+            const grid = document.getElementById('puzzle');
+            grid.innerHTML = '';
+            
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    const piece = document.createElement('div');
+                    piece.className = 'puzzle-piece' + (puzzle[i][j] === 0 ? ' empty' : '');
+                    
+                    if (puzzle[i][j] !== 0) {
+                        piece.textContent = puzzle[i][j];
+                        piece.onclick = () => movePiece(i, j);
+                    }
+                    
+                    grid.appendChild(piece);
+                }
+            }
+        }
+
+        function newGame() {
+            moves = 0;
+            document.getElementById('moves').textContent = '0';
+            initPuzzle();
+        }
+
+        function closeGame() {
+            tg.close();
+        }
+
+        // Запускаем игру
+        initPuzzle();
+    </script>
+</body>
+</html>

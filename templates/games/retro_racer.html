@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ретро-гонки</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #2a2a2a, #3a3a3a);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        .game-container {
+            background: #3a3a3a;
+            padding: 30px;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 90%;
+            max-width: 600px;
+            border: 3px solid #ff4500;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            color: #ff4500;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        canvas {
+            background: #2a2a2a;
+            border: 4px solid #ff4500;
+            border-radius: 15px;
+            display: block;
+            margin: 20px auto;
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+        }
+        .dashboard {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            font-size: 1.5rem;
+        }
+        .speed { color: #ff4500; }
+        .score { color: #ffd700; }
+        .controls {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .control-btn {
+            background: #ff4500;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.5rem;
+            border-radius: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .control-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 15px rgba(255,69,0,0.3);
+        }
+        .action-btn {
+            background: #ff4500;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255,69,0,0.3);
+        }
+        .back-btn {
+            background: transparent;
+            color: #ff4500;
+            border: 2px solid #ff4500;
+        }
+        .game-over {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            padding: 30px;
+            border-radius: 20px;
+            border: 3px solid #ff4500;
+            display: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🏁 Ретро-гонки</h1>
+        
+        <canvas id="gameCanvas" width="400" height="600"></canvas>
+        
+        <div class="dashboard">
+            <div class="speed">Скорость: <span id="speed">0</span></div>
+            <div class="score">Счет: <span id="score">0</span></div>
+        </div>
+        
+        <div class="controls">
+            <button class="control-btn" onclick="moveLeft()">←</button>
+            <button class="control-btn" onclick="moveRight()">→</button>
+        </div>
+        
+        <button class="action-btn" onclick="startRace()">🏁 Старт</button>
+        <button class="action-btn" onclick="resetRace()">🔄 Новая гонка</button>
+        <button class="back-btn" onclick="closeGame()">⬅️ Назад</button>
+    </div>
+    
+    <div class="game-over" id="gameOver">
+        <h2>Гонка окончена!</h2>
+        <p style="font-size: 2rem; margin: 20px;" id="finalRaceScore"></p>
+        <button class="action-btn" onclick="resetRace()">Еще заезд</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let car = {
+            x: 175,
+            y: 500,
+            width: 50,
+            height: 80
+        };
+        
+        let obstacles = [];
+        let score = 0;
+        let speed = 5;
+        let gameRunning = false;
+        let gameInterval;
+
+        function drawRoad() {
+            // Асфальт
+            ctx.fillStyle = '#2a2a2a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Разметка
+            ctx.strokeStyle = '#ffd700';
+            ctx.lineWidth = 5;
+            ctx.setLineDash([30, 30]);
+            
+            // Центральная линия
+            ctx.beginPath();
+            ctx.moveTo(canvas.width/2, 0);
+            ctx.lineTo(canvas.width/2, canvas.height);
+            ctx.stroke();
+            
+            // Боковые линии
+            ctx.setLineDash([]);
+            ctx.strokeStyle = '#ff4500';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(20, 0, canvas.width - 40, canvas.height);
+        }
+
+        function drawCar() {
+            // Корпус
+            ctx.fillStyle = '#ff4500';
+            ctx.shadowColor = '#ff4500';
+            ctx.shadowBlur = 15;
+            ctx.fillRect(car.x, car.y, car.width, car.height);
+            
+            // Окна
+            ctx.fillStyle = '#87CEEB';
+            ctx.shadowBlur = 0;
+            ctx.fillRect(car.x + 5, car.y + 10, 15, 20);
+            ctx.fillRect(car.x + car.width - 20, car.y + 10, 15, 20);
+            
+            // Фары
+            ctx.fillStyle = '#ffff00';
+            ctx.beginPath();
+            ctx.arc(car.x + 5, car.y + car.height - 10, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(car.x + car.width - 5, car.y + car.height - 10, 8, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Колеса
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(car.x - 5, car.y + 10, 10, 20);
+            ctx.fillRect(car.x + car.width - 5, car.y + 10, 10, 20);
+            ctx.fillRect(car.x - 5, car.y + car.height - 30, 10, 20);
+            ctx.fillRect(car.x + car.width - 5, car.y + car.height - 30, 10, 20);
+        }
+
+        function drawObstacles() {
+            obstacles.forEach(obs => {
+                // Разные типы препятствий
+                if (obs.type === 'car') {
+                    ctx.fillStyle = '#8b4513';
+                    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                    
+                    // Окна
+                    ctx.fillStyle = '#87CEEB';
+                    ctx.fillRect(obs.x + 5, obs.y + 10, 10, 15);
+                    ctx.fillRect(obs.x + obs.width - 15, obs.y + 10, 10, 15);
+                } else {
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+                    
+                    // Предупреждающие полосы
+                    ctx.fillStyle = '#ffff00';
+                    for (let i = 0; i < 3; i++) {
+                        ctx.fillRect(obs.x, obs.y + i * 15, obs.width, 5);
+                    }
+                }
+            });
+        }
+
+        function update() {
+            if (!gameRunning) return;
+            
+            // Движение препятствий
+            obstacles.forEach(obs => {
+                obs.y += speed;
+            });
+            
+            // Удаление старых препятствий
+            obstacles = obstacles.filter(obs => obs.y < canvas.height);
+            
+            // Создание новых препятствий
+            if (Math.random() < 0.02) {
+                const type = Math.random() < 0.7 ? 'car' : 'block';
+                obstacles.push({
+                    x: 50 + Math.floor(Math.random() * 300),
+                    y: -50,
+                    width: type === 'car' ? 40 : 50,
+                    height: type === 'car' ? 70 : 50,
+                    type: type
+                });
+            }
+            
+            // Проверка столкновений
+            obstacles.forEach(obs => {
+                if (car.x < obs.x + obs.width &&
+                    car.x + car.width > obs.x &&
+                    car.y < obs.y + obs.height &&
+                    car.y + car.height > obs.y) {
+                    gameOver();
+                }
+            });
+            
+            // Увеличение счета
+            score += speed;
+            document.getElementById('score').textContent = Math.floor(score / 10);
+            
+            // Увеличение скорости
+            if (score % 500 === 0) {
+                speed += 1;
+                document.getElementById('speed').textContent = speed;
+            }
+            
+            draw();
+        }
+
+        function draw() {
+            drawRoad();
+            drawObstacles();
+            drawCar();
+        }
+
+        function moveLeft() {
+            if (car.x > 30) {
+                car.x -= 30;
+            }
+        }
+
+        function moveRight() {
+            if (car.x < canvas.width - car.width - 30) {
+                car.x += 30;
+            }
+        }
+
+        function startRace() {
+            if (!gameRunning) {
+                gameRunning = true;
+                gameInterval = setInterval(update, 50);
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            clearInterval(gameInterval);
+            
+            document.getElementById('finalRaceScore').textContent = `Счет: ${Math.floor(score / 10)}`;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+
+        function resetRace() {
+            car.x = 175;
+            obstacles = [];
+            score = 0;
+            speed = 5;
+            gameRunning = false;
+            
+            document.getElementById('score').textContent = '0';
+            document.getElementById('speed').textContent = '5';
+            document.getElementById('gameOver').style.display = 'none';
+            
+            clearInterval(gameInterval);
+            draw();
+        }
+
+        // Управление с клавиатуры
+        document.addEventListener('keydown', (e) => {
+            if (!gameRunning) return;
+            
+            if (e.key === 'ArrowLeft') moveLeft();
+            if (e.key === 'ArrowRight') moveRight();
+        });
+
+        function closeGame() {
+            tg.close();
+        }
+
+        // Инициализация
+        draw();
+    </script>
+</body>
+</html>
